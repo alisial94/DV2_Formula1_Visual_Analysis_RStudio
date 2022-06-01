@@ -1,0 +1,367 @@
+---
+title: "Visual Analysis on Formula 1"
+subtitle: "CEU Data Visualization 2 - Final Project"
+author: "Ali Hasnain Khan Sial"
+date: "1/14/2022"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+library(gganimate)
+library(ggrepel)
+library(tidyverse)
+library(ggplot2)
+library(googleway)
+library(viridis)
+library(animation)
+library(fixest)
+library(GGally)
+library(modelsummary)
+library(dplyr)
+library(prettydoc)
+library(esquisse)
+library(kableExtra)
+```
+
+## Introduction
+
+This documents aims to perform a visual analysis on Formula 1. The data used for analysis was obtained from **[TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-09-07/readme.md)** (please click to access the data). The dataset includes 13 different tables but this analysis, I have only used 8. I begin exploring the data by first directly loading it using the provided links. You can also access the data via tidytuesday R package. 
+
+```{r, warning=FALSE, message=FALSE}
+circuits <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/circuits.csv')
+driver_standings <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/driver_standings.csv')
+drivers <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/drivers.csv')
+races <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/races.csv')
+constructor_standings <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructor_standings.csv')
+results <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/results.csv')
+constructor_results <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructor_results.csv')
+constructors <- fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructors.csv')
+
+```
+
+## Exploratory Data Analysis
+
+Below you can find codes for the exploratory data analysis I performed in order to understand the data. Based on this exploration, I developed 5 research question that I plan on answer via visualizations that have been provided later in this document. The questions are as follows:
+
+- Who are the Top 10 Drivers of all time in F1 based on number of wins?
+- Geo-location of each circuits used in F1 Grand Prix Races and the number of races they have hosted?
+- Distribution of Max Speed achieved by each Constructor between 2010-2021?
+- Comparison of the points achieved by the Top 4 Constructors in the last decade (2010-2021)?
+- To discover if there is a pattern of association between number wins by each driver and number of races they have been a part of?
+
+
+```{r, echo=T, results='hide'}
+#glimpse(circuits)
+#glimpse(drivers)
+#glimpse(constructors)
+#glimpse(races)
+#glimpse(results)
+#glimpse(constructor_standings)
+#glimpse(constructor_results)
+
+
+#datasummary_skim(races)
+#datasummary_skim(results)
+#datasummary_skim(constructor_standings)
+#datasummary_skim(constructor_results)
+
+#plot(races)
+#plot(results)
+#plot(constructor_standings)
+#plot(constructor_results)
+
+```
+
+
+## Top 10 F1 Drivers of all time:
+The histogram below shows the wins comparison for F1 drivers of all time with Lewis Hamilton and Michael Schumacher topping the table. An additional stacked bar chart comparison of Total Races and Wins for the Top 10 drivers has also been added. The  graph points towards some pattern of association between the number of races a driver has taken part in and the number of wins. I will be exploring this hunch later in the analysis. 
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.align="center"}
+
+# Top 10 drivers of all time 
+
+
+# merging tables 
+w_10  <- results[drivers, on = "driverId"]
+w_10 <- races[w_10, on = "raceId"]
+
+# Filtering the wins
+w_10 <- w_10[position == '1']
+
+# New column for full driver name
+w_10 <- w_10[, Driver := paste(forename, surname)]
+
+# Calculating number of wins
+w_10 <- w_10[, .(Wins = .N), by = .(driverId, Driver)][order(-Wins)][1:10]
+
+# calculating number of races
+n_r <- results[drivers, on = "driverId"]
+n_r <- n_r[, .(Races = .N), by = .(driverId)][order(driverId)]
+
+# merging the tables
+w_10 <- n_r[w_10, on = "driverId"]
+w_10 <- w_10[, .(Driver, Races, Wins)]
+
+# creating frames for animation
+a <- data.frame(Driver=c("Lewis Hamilton","Michael Schumacher","Sebastian Vettel", 
+                          "Alain Prost", "Ayrton Senna", "Fernando Alonso", "Nigel Mansell",
+                          "Jackie Stewart", "Niki Lauda", "Jim Clark"), 
+                Wins=c(0,0,0,0,0,0,0,0,0,0), 
+                frame=rep('a',10))
+
+b <- data.frame(Driver=c("Lewis Hamilton","Michael Schumacher","Sebastian Vettel", 
+                         "Alain Prost", "Ayrton Senna", "Fernando Alonso", "Nigel Mansell",
+                         "Jackie Stewart", "Niki Lauda", "Jim Clark"), 
+                Wins=c(33,30,17,17,13,10,10,9,8,8), frame=rep('b',10))
+
+c <- data.frame(Driver=c("Lewis Hamilton","Michael Schumacher","Sebastian Vettel", 
+                         "Alain Prost", "Ayrton Senna", "Fernando Alonso", "Nigel Mansell",
+                         "Jackie Stewart", "Niki Lauda", "Jim Clark"), 
+                Wins=c(66,60,34,34,26,20,20,18,16,16), frame=rep('c',10))
+
+d <- data.frame(Driver=c("Lewis Hamilton","Michael Schumacher","Sebastian Vettel", 
+                         "Alain Prost", "Ayrton Senna", "Fernando Alonso", "Nigel Mansell",
+                         "Jackie Stewart", "Niki Lauda", "Jim Clark"), 
+                Wins=c(99,91,53,51,41,32,31,27,25,25), frame=rep('d',10))
+
+# adding frames to data
+w_10s <- rbind(a,b,c,d)
+
+
+# Ploting the graph for top 10 drivers
+ggplot(data = w_10s, aes(x=Driver, y=Wins, fill=Driver)) + 
+  geom_bar(stat = 'identity',width=0.5) +
+  geom_text(aes(label=Wins), hjust=1.6, color="white", size=3.5) +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_viridis(discrete = T) +
+  ggtitle("Top 10 Drivers by Wins") +
+  # gganimate specific bits:
+  transition_states(
+    frame,
+    transition_length = 2,
+  ) +
+  ease_aes('sine-in-out')
+
+
+# Wins Vs Races
+i <- w_10[,.(Driver, Wins, dif = (Races - Wins))]
+i <- pivot_longer(i, c(Wins, dif))
+i<- i %>% mutate (lable= c(99,279,91,308,53,271,51,202,41,162,32,327,31,192,27,100,25,174,25,73))
+
+  
+i%>% 
+ggplot( aes(x=Driver, y=value, fill=name)) + 
+  geom_bar(position = 'stack', stat = 'identity',width=0.7,) +
+  geom_col( ) +
+  geom_text(aes(label=(lable)), hjust=1.5, color="Black", size=3.5) +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values=c("#66B7B0","yellow2"), labels = c("Wins", "Total Races")) +
+  ggtitle("Top 10 Drivers Wins Vs Races")+
+  theme_minimal() +
+  labs(
+    fill = "", 
+    color = "name",
+    y = "Number of Wins/Races",
+    x = "Drivers")
+
+```
+
+
+
+
+
+## Geo-location of each circuit using google API
+The map below shows the location of each circuit, you can click on the marker to see the name of circuit, name of city and country and also the number of races it has hosted. To make it easier for you to locate, I have also added different colors to the markers based on the number of races hosted. The colour are divided as follows:
+
+- Red: Races <= 10
+- Lavender: Races <= 20
+- Blue: Races <= 40
+- Green: Races > 40 
+
+
+Note: the API I have used isn't paid therefore, the map might appear a bit dull. If you want to create a map for yourself, you would need to get a free API Google Key for Geo mapping.
+
+```{r, include=FALSE}
+api_key <- "AIzaSyA1CGIT3XP3GjkyGdU4DHs7sgS0FLFiQys"
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.align="center"}
+
+
+### Map of circuits
+v <- races[, .(count = .N), by = .(circuitId)]
+
+# merging table
+c_r <- merge(circuits, v)
+
+## creating map using google maps 
+api_key <- api_key
+
+### adding colour for the marker based on number of races
+c_r <- c_r %>%  mutate(color = case_when(
+  count <= 10 ~ "red",
+  count <= 20 ~ "lavender",
+  count <= 40 ~ "blue",
+  count > 40 ~ "green"
+))
+
+## adding info links
+c_r$INFO <- paste0(c_r$name, " | ", c_r$location, " | ", c_r$country, " | ", c_r$count)
+
+## final map
+map <- google_map(
+  key = api_key,
+  data = c_r
+)
+map %>%
+  add_markers(lat = "lat", lon = "lng", colour = "color",  info_window = "INFO")
+
+
+```
+
+
+
+
+## Max Speed Dirstribution by Constructors
+The graph below shows the max speed achieved by the active constructors in the last two seasons. The idea was to highlight the which constructor out performed the others. As you can see that even though the max speed distribution for all the constructor is more or less same, but in this sport even smallest amount of extra speed can make a huge difference. The Mercedes cars achieved the highest speed which is also consistent with the cars having a better build and also producing better results since the dominated the seasons on the bases of speed.
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.align="center"}
+### Constructors max speed for the season 2019 - 2021
+races_filtered <- races[year %in% c(2019:2021)]
+races_filtered <- races_filtered[,-c(6:8)]
+
+# Merge the cleaned race data set with the constructor points, both data sets share the raceID column
+race_constructor <- merge(x = races_filtered, y = constructor_results)
+
+# Filtering constructors to get only the data I need
+clean_constructors <- constructors[,.(constructorId,name,nationality)]
+
+#Change name column because they are overlapping when merging
+clean_constructors <- clean_constructors %>% 
+  rename(constructorName = name)
+
+# Selecting fastest lap speed and constructorId
+clean_results <- results[, .(constructorId, raceId, fastestLapSpeed) ]
+
+# Get max speed per race and constructor
+constructors_maxspeed <- merge(x = clean_constructors, clean_results) %>% 
+  filter(!is.na(fastestLapSpeed))
+
+# checking for missing
+to_filter <- sapply(constructors_maxspeed, function(x) sum(is.na(x)))
+to_filter[to_filter > 0]
+
+
+# merging columns for final plots
+constructors_maxspeed$fastestLapSpeed <- as.numeric(constructors_maxspeed$fastestLapSpeed)
+max_speed <- constructors_maxspeed[race_constructor, on = "raceId"]
+
+# plotting the graph
+  
+max_speed %>% 
+  mutate(constructorName = fct_reorder(constructorName, fastestLapSpeed)) %>% 
+  ggplot(aes(x= fastestLapSpeed, y = constructorName)) +
+  geom_violin(aes(fill = nationality, color = nationality), width = 0.5, size = 0.1) +
+  scale_fill_viridis(discrete = T) +
+  scale_color_viridis(discrete = T) +
+  geom_boxplot(width = 0.2, size = 0.05, alpha = 0.3, color = "deepPink4") +
+  ggtitle("Max speed per lap by Constructor (2019-2021)")+
+  theme_minimal() +
+  labs(
+    fill = "Constructor Nationality", 
+    color = "Constructor Nationality",
+    y = NULL,
+    x = "Fastest Lap Speed (KM/H)") 
+```
+
+
+
+
+## Top 4 Constructor points comparison over last decade. 
+In this visual, I wanted to compare the yearly points of the Top 4 constructors which is Mercedes, Red Bull, Ferrari and Mclaren between 2010-2012. The points at the end of the animation appear to be a bit off compared to the previous year for all the constructors shown below. That's mainly because when this data was made available for use the F1 Season 2021 had not ended. We see from the chart that Mercedes has been consistently dominating the points, but in the last few years the others have started catching up giving them a tough time. It appears that the prime era of Mercedes is about to end or at least they will have to put in a good fight to continue. 
+
+
+```{r,message=FALSE, warning=FALSE, fig.width=8, fig.align="center"}
+## Top 4 Constructor points comparison
+
+# merging data tables required for calculations
+constructors_points <- constructors[constructor_results, on = "constructorId"]
+constructors_points <- races[constructors_points, on ="raceId"]
+
+# calculating sum of points per year
+constructors_points <- constructors_points[, .(points_y = sum(points)), by= .(year, constructorId, i.name)]
+
+# Filtering the top 4 teams and the year of comparison
+constructors_points <- constructors_points[i.name %in% c('Red Bull','Mercedes', 'McLaren','Ferrari')]
+constructors_points <- constructors_points[year %in% c(2010:2021)]
+
+# renaming a column
+constructors_points <- constructors_points %>% 
+  rename(Constructor = i.name)
+
+# plotting the graph
+f <- ggplot(data = constructors_points,aes(x=year, y=points_y,  colour=(Constructor))) +
+  geom_line( size=1) + 
+  geom_point() +
+  scale_color_viridis(discrete = T) +
+  facet_wrap(~constructors_points$Constructor) +
+  labs(x = "Years",
+       y = "Ponts per Year",
+       title = "Points per Year Comparison for Top 4 Teams")  +
+  theme_minimal() +
+    theme(legend.position = "none") +
+    transition_reveal(year) 
+ 
+    animate(f, end_pause = 30,fps = 5)
+```
+
+
+## No. of Wins Vs No. of Races
+The analysis below intends to understand if there is a pattern of association between number of wins a driver has and the number of races they have taken part in. To do this I ran a linear regression between the two variables. The table below in-tails the findings. The coefficient suggests a very weak relation between the two variables. But yet it is a positive linear relation which can not be neglected since it has a 99% level of significance. The graph below shows this relationship using linear smoothing to the scatter points. 
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.align="center"}
+## Relationship between number of wins and number of races a driver has been a part of..
+
+# calculating total wins per driver        
+wins  <- results[drivers, on = "driverId"]
+wins <- races[wins, on = "raceId"]
+wins <- wins[position == '1']
+wins <- wins[, Driver := paste(forename, surname)]
+wins <- wins[, .(Wins = .N), by = .(Driver, driverId)][order(driverId)]
+
+# calculating total races per driver
+n_races <- results[drivers, on = "driverId"]
+n_races <- n_races[,.(n_races =.N), by = .(driverId)][order(driverId)]
+
+# mering the two for final data
+w_r <- n_races[wins, on = "driverId"]
+
+# regression
+regWvR <- feols( log(Wins) ~ n_races, data=w_r, vcov = 'hetero' )
+msummary(regWvR  )
+
+# ploting the regression 
+w_r %>% 
+  filter(Wins > 0) %>%
+  ggplot( aes(x = n_races, y = log(Wins)) )+
+  geom_point(color='seagreen4',size=2,alpha=0.6) +
+  geom_smooth(method="lm" , formula = y ~ x , color = 'purple')+
+  labs(x = "Number of Races",
+       y = "Log of Number of Wins",
+       title = "Linear Relationship between Number of Wins and Number of Races")  +
+  theme_minimal() 
+```
+
+
+## Conclusion 
+The analysis performed above shows that Mercedes as the team dominated the F1 during 2013-2019, this is also consistent with the top driver of all time Lewis Hamilton with 99 Grand Prix Championships. Red Bull is the team that appears to be catching up to the Mercedes and appears to be giving them a tough time in the recent years. One of the main questions that I wanted to answer with this analysis was if there is an relationship between races and wins still requires additional analysis and more detailed analysis with incorporating other variables that could impact the number of wins. Even though it appears that both the Top 2 driver L. Hamilton and M.Schumacher where able to win more races due to the amount of races they have participated in, but this isn't consistent with few other drivers such as F.Alonso, as even though he is part of Top 10, there is a huge gap in between his number of races and number of wins.
